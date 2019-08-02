@@ -1,6 +1,7 @@
 from app import db
 import datetime
 from sqlalchemy.orm import validates
+from passlib.hash import pbkdf2_sha256 as sha256
 
 
 def calculate_age(context):
@@ -13,14 +14,54 @@ class Player(db.Model):
     __tablename__ = 'player'
 
     id = db.Column(db.Integer, primary_key=True)
+    password = db.Column(db.String(120), nullable = False)
     name = db.Column(db.String(30), nullable=False)
     mobile = db.Column(db.String(15), unique=True, nullable=False)
-    dob = db.Column(db.Date, default=datetime.datetime.utcnow)
+    dob = db.Column(db.Date, default=datetime.datetime.today)
     age = db.Column(db.String(20), default=calculate_age)
+    type = db.Column(db.Integer, default=0)
     rollno = db.Column(db.String(15))
 
     def __repr__(self):
         return '<Player {}>'.format(self.name)
+
+    @classmethod
+    def find_by_mobile(cls, mobile):
+        return cls.query.filter_by(mobile = mobile).first()
+
+    @staticmethod
+    def generate_hash(password):
+        return sha256.hash(password)
+
+    @staticmethod
+    def verify_hash(password, hash):
+        return sha256.verify(password, hash)
+
+
+class Announcements(db.Model):
+    __tablename__ = 'announcements'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.now)
+    title = db.Column(db.String(100), nullable = False)
+    description = db.Column(db.Text, nullable = False)
+
+    def __repr__(self):
+        return '<Announcement {}>'.format(self.id)
+
+class RevokedTokenModel(db.Model):
+    __tablename__ = 'revoked_tokens'
+    id = db.Column(db.Integer, primary_key = True)
+    jti = db.Column(db.String(120))
+
+    def add(self):
+        db.session.add(self)
+        db.session.commit()
+
+    @classmethod
+    def is_jti_blacklisted(cls, jti):
+        query = cls.query.filter_by(jti = jti).first()
+        return bool(query)
+
 
 
 # player oriented match

@@ -1,9 +1,10 @@
-from app.serializers import PlayerSchema, SingleMatchSchema, DoubleMatchSchema, SimplePlayerSchema, DoubleSummarySchema, SingleSummarySchema
-from app.models import Player, SingleMatch, DoubleMatch
+from app.serializers import PlayerSchema, SingleMatchSchema, DoubleMatchSchema, SimplePlayerSchema, DoubleSummarySchema, SingleSummarySchema, AnnouncementSchema, AnnouncementListSchema
+from app.models import Player, SingleMatch, DoubleMatch, Announcements
 from app import app, db
 from flask import request, jsonify, send_from_directory
 from sqlalchemy import exc, or_
 from dateutil.parser import parse
+from flask_jwt_extended import jwt_required
 import os
 
 from pathlib import Path
@@ -24,7 +25,63 @@ def page_not_found(error):
     return jsonify({"status":"failure", "error": "object not found", "path":request.path}), 404
 
 ###################################################################################
-################################ Player APIs #######################################
+################################ Announcement APIs ################################
+###################################################################################
+
+anns = AnnouncementSchema(strict=False)
+
+@app.route('/api/announcement/list/', methods=['GET'])
+def get_announcement_list():
+    simple_announcement_schema = AnnouncementListSchema(many=True, strict=False)
+    all_announcements = Announcements.query.with_entities(Announcements.id, Announcements.timestamp, Announcements.title).all()
+    all_announcements.sort(key=lambda item: item.timestamp, reverse=True)
+    return jsonify(simple_announcement_schema.dump(all_announcements).data)
+
+@app.route('/api/announcement/get/<id>', methods=['GET'])
+def get_announcement(id):
+    announcement = Announcements.query.get_or_404(id)
+    return jsonify(anns.dump(announcement).data)
+
+@app.route('/api/announcement/post/', methods=['POST'])
+def post_announcement():
+    try:
+        data, err = anns.load(request.json)
+        if err:
+            return err
+        else:
+            db.session.add(data)
+            db.session.commit()
+    except exc.IntegrityError as e:
+        db.session.rollback()
+        return err("database integrity error")
+    else:
+        return {
+            "status": "success"
+        }
+
+@app.route('/api/announcement/put/<id>', methods=['PUT'])
+@jwt_required
+def update_announcement(id):
+    p = Announcements.query.get_or_404(id)
+    fr = dict(filter(lambda e: e[0] in ['timestamp', 'title', 'description'], request.json.items()))
+    for key, value in fr.items():
+        if value != getattr(p, key):
+            setattr(p, key, value)
+    db.session.commit()
+    return get_announcement(id)
+
+@app.route('/api/announcement/delete/<id>', methods=['DELETE'])
+@jwt_required
+def delete_announcement(id):
+    a = Announcements.query.get_or_404(id)
+    db.session.delete(a)
+    db.session.commit()
+    return {
+        "status": "success"
+    }
+
+###################################################################################
+################################ Player APIs ######################################
 ###################################################################################
 
 def get_single_query(id):
@@ -84,9 +141,10 @@ def post_player():
         return jsonify(single_player_schema.dump(data).data)
 
 @app.route('/api/player/put/<id>', methods=['PUT'])
+@jwt_required
 def update_player(id):
     p = Player.query.get_or_404(id)
-    fr = dict(filter(lambda e: e[0] in ['name', 'mobile', 'dob', 'rollno'], request.json.items()))
+    fr = dict(filter(lambda e: e[0] in ['name', 'mobile', 'dob', 'rollno', 'type'], request.json.items()))
     for key, value in fr.items():
         if value != getattr(p, key):
             setattr(p, key, value)
@@ -94,6 +152,7 @@ def update_player(id):
     return get_player(id)
 
 @app.route('/api/player/delete/<id>', methods=['DELETE'])
+@jwt_required
 def delete_player(id):
     id = int(id)
     p = Player.query.get_or_404(id)

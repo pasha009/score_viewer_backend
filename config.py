@@ -11,6 +11,10 @@ class Config(object):
         'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    JWT_SECRET_KEY = 'jwt-secret-string'
+    JWT_BLACKLIST_ENABLED = True
+    JWT_BLACKLIST_TOKEN_CHECKS = ['access', 'refresh']
+
 class ProductionConfig(Config):
     DEBUG = False
 

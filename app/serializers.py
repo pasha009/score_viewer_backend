@@ -1,5 +1,16 @@
 from app import ma
-from app.models import Player, SingleMatch, DoubleMatch
+from app.models import Player, SingleMatch, DoubleMatch, Announcements
+
+class AnnouncementSchema(ma.ModelSchema):
+    class Meta:
+        fields = ('timestamp', 'title', 'description')
+        model = Announcements
+
+class AnnouncementListSchema(ma.ModelSchema):
+    class Meta:
+        fields = ('id', 'timestamp', 'title')
+        model = Announcements
+
 
 class SimplePlayerSchema(ma.ModelSchema):
     class Meta:
@@ -14,7 +25,7 @@ class SimplePlayerSchema(ma.ModelSchema):
 class PlayerSchema(ma.ModelSchema):
 
     class Meta:
-        fields = ( 'id', 'name', 'rollno', 'pwin', 'plos', 'dwin', 'dlos', 'age', 'mobile', 'dob', 'image', 'delete_player', 'update_player')
+        fields = ( 'id','password', 'name', 'rollno', 'pwin', 'plos', 'dwin', 'dlos', 'age', 'mobile', 'dob', 'image', 'delete_player', 'update_player', 'type')
         model = Player
 
     image = ma.URLFor("get_player_image", id="<id>")
