@@ -5,7 +5,7 @@ from flask import request, jsonify, send_from_directory
 from sqlalchemy import exc, or_
 from dateutil.parser import parse
 from flask_jwt_extended import jwt_required
-import os
+import os, glob
 
 from pathlib import Path
 sfd = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static')
@@ -97,10 +97,30 @@ def get_double_query(id):
                   DoubleMatch.loser2_id == id) )
             ]
 
-@app.route('/api/player/image/<id>', methods=['GET'])
+@app.route('/api/player/image/get/<id>', methods=['GET'])
 def get_player_image(id):
-    filename = str(id) + '.jpeg'
-    return send_from_directory(sfd, filename)
+    try:
+        filename = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], str(id) + '*'))[0]
+        filename = os.path.basename(filename)
+        return send_from_directory(sfd, filename)
+    except Exception as e:
+        print(e)
+        return send_from_directory(sfd, 'default.jpeg')
+
+
+@app.route('/api/player/image/post/', methods = ['POST'])
+def post_player_image():
+    if request.files['image']:
+        img = request.files['image']
+        ext = os.path.splitext(img.filename)[1]
+        img_name = request.form['id'] + ext
+        saved_path = os.path.join(app.config['UPLOAD_FOLDER'], img_name)
+        for filename in glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], request.form['id'] + '*')):
+            os.remove(filename)
+        img.save(saved_path)
+        return {"status": "success"}
+    else:
+        return {"status": "error"}
 
 
 @app.route('/api/player/list/', methods=['GET'])
@@ -147,9 +167,12 @@ def update_player(id):
     fr = dict(filter(lambda e: e[0] in ['name', 'mobile', 'dob', 'rollno', 'type'], request.json.items()))
     for key, value in fr.items():
         if value != getattr(p, key):
+            if key == 'dob':
+                setattr(p, key, parse(value))
+                continue
             setattr(p, key, value)
     db.session.commit()
-    return get_player(id)
+    return {"status" : "success"}
 
 @app.route('/api/player/delete/<id>', methods=['DELETE'])
 @jwt_required
@@ -180,7 +203,6 @@ def get_all_singlematches():
     return jsonify(singlematches_schema.dump(s).data)
 
 
-
 @app.route('/api/singlematch/list/bymatch/<pid>', methods=['GET'])
 def get_singlematch_list_match(pid):
     s = SingleMatch.query.filter(or_(SingleMatch.winner_id == pid, SingleMatch.loser_id == pid))
@@ -188,6 +210,27 @@ def get_singlematch_list_match(pid):
     singlematchex_schema.context = { "player_id" : pid }
     return jsonify(singlematchex_schema.dump(s).data)
 
+@app.route('/api/singlematch/list/byplayers/', methods=['GET'])
+def get_player_by_singlematch():
+    w = db.session.query(SingleMatch.winner_id,  SingleMatch.loser_id, db.func.count(SingleMatch.id)).group_by(SingleMatch.winner_id).all()
+    l = db.session.query(SingleMatch.winner_id,  SingleMatch.loser_id, db.func.count(SingleMatch.id)).group_by(SingleMatch.loser_id).all()
+    mdict = {}
+    for match in w:
+        mdict[match[0]] = [match[2], 0]
+    for match in l:
+        val = mdict.setdefault(match[1], [0, 0])
+        mdict[match[1]] = list(map(sum, zip(val, [0, match[2]])))
+    simple_player_schema = SimplePlayerSchema(strict=False)
+    mlist = []
+    for key, value in mdict.items():
+        p = simple_player_schema.dump(Player.query.get_or_404(int(key))).data
+        mlist.append({
+            "player": p,
+            "wins": value[0],
+            "loss": value[1]
+        })
+    mlist.sort(key=lambda item: (item["wins"]/(item["loss"] + 1), item["wins"]), reverse=True)
+    return jsonify(mlist)
 
 @app.route('/api/singlematch/list/byopponent/<pid>', methods=['GET'])
 def get_singlematch_list_opponent(pid):
@@ -213,12 +256,13 @@ def get_singlematch_list_opponent(pid):
     # return jsonify(singlematchex_schema.dump(s).data)
 
 
-@app.route('/api/singlematch/post', methods=['POST'])
+@app.route('/api/singlematch/post/', methods=['POST'])
 def post_singlematch():
     sdata, errors = singlematch_schema.load(request.json)
     if errors:
         return err(errors)
     db.session.add(sdata)
+    print(sdata)
     try:
         db.session.commit()
     except exc.IntegrityError as e:

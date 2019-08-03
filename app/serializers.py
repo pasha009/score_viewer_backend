@@ -1,5 +1,7 @@
 from app import ma
 from app.models import Player, SingleMatch, DoubleMatch, Announcements
+import datetime
+
 
 class AnnouncementSchema(ma.ModelSchema):
     class Meta:
@@ -22,6 +24,11 @@ class SimplePlayerSchema(ma.ModelSchema):
     update_player = ma.URLFor("update_player", id="<id>")
     delete_player = ma.URLFor("delete_player", id="<id>")
 
+def calculate_age(born):
+    today = datetime.date.today()
+    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    return "{} years old".format(age)
+
 class PlayerSchema(ma.ModelSchema):
 
     class Meta:
@@ -31,6 +38,7 @@ class PlayerSchema(ma.ModelSchema):
     image = ma.URLFor("get_player_image", id="<id>")
     update_player = ma.URLFor("update_player", id="<id>")
     delete_player = ma.URLFor("delete_player", id="<id>")
+    age = ma.Function(lambda player, context: calculate_age(player.dob))
     pwin = ma.Function(lambda match, context: int(context['pwin']))
     plos = ma.Function(lambda match, context: int(context['plos']))
     dwin = ma.Function(lambda match, context: int(context['dwin']))

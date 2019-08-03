@@ -1,14 +1,8 @@
 from app import db
-import datetime
 from sqlalchemy.orm import validates
 from passlib.hash import pbkdf2_sha256 as sha256
+import datetime
 
-
-def calculate_age(context):
-    born = context.get_current_parameters()['dob']
-    today = datetime.date.today()
-    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-    return "{} years old".format(age)
 
 class Player(db.Model):
     __tablename__ = 'player'
@@ -18,7 +12,6 @@ class Player(db.Model):
     name = db.Column(db.String(30), nullable=False)
     mobile = db.Column(db.String(15), unique=True, nullable=False)
     dob = db.Column(db.Date, default=datetime.datetime.today)
-    age = db.Column(db.String(20), default=calculate_age)
     type = db.Column(db.Integer, default=0)
     rollno = db.Column(db.String(15))
 
@@ -69,7 +62,7 @@ class SingleMatch(db.Model):
     __tablename__ = 'singlematch'
 
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, index=True, default=datetime.datetime.utcnow)
+    date = db.Column(db.Date, index=True, default=datetime.datetime.now)
     winner_id = db.Column(db.Integer, db.ForeignKey('player.id'))
     loser_id = db.Column(db.Integer, db.ForeignKey('player.id'))
     # winner_name = db.Column(db.String(30))
@@ -93,7 +86,7 @@ class DoubleMatch(db.Model):
     __tablename__ = 'doublematch'
 
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, index=True, default=datetime.datetime.utcnow)
+    date = db.Column(db.Date, index=True, default=datetime.datetime.now)
     winner1_id = db.Column(db.Integer, db.ForeignKey('player.id'))
     winner2_id = db.Column(db.Integer, db.ForeignKey('player.id'))
     loser1_id = db.Column(db.Integer, db.ForeignKey('player.id'))

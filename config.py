@@ -15,6 +15,7 @@ class Config(object):
     JWT_BLACKLIST_ENABLED = True
     JWT_BLACKLIST_TOKEN_CHECKS = ['access', 'refresh']
 
+
 class ProductionConfig(Config):
     DEBUG = False
 
